@@ -114,6 +114,26 @@ in
       # NixOS automatically includes module dependencies (libnvdimm, etc.).
       boot.initrd.kernelModules = [ "virtio_pmem" ];
 
+      # On kernels built with CONFIG_NVDIMM_KEYS=y (the NixOS default),
+      # libnvdimm.ko has a hard symbol dependency on encrypted-keys.ko,
+      # which lists trusted.ko as a pre-softdep. trusted.ko probes TPM/TEE
+      # backends at init time and returns -ENODEV in VMs without a vTPM,
+      # causing the full dep chain (trusted → encrypted-keys → libnvdimm →
+      # virtio_pmem) to fail in systemd-modules-load.service.
+      #
+      # The install rule intercepts modprobe calls for 'trusted' (including
+      # those from dep resolution) and substitutes /bin/true, returning
+      # success without loading the module. encrypted-keys.ko references
+      # trusted only via a runtime request_key() lookup (MODULE_SOFTDEP,
+      # not a hard symbol import), so it loads and exports key_type_encrypted
+      # normally. libnvdimm.ko and virtio_pmem.ko then load successfully.
+      #
+      # boot.extraModprobeConfig is propagated into the initrd by NixOS
+      # for both busybox (stage-1.nix) and systemd initrd.
+      # /bin/true is provided by pkgs.coreutils, which is in initrdBin by
+      # default.
+      boot.extraModprobeConfig = "install trusted /bin/true";
+
       microvm.storeDiskPmemImage = pkgs.runCommand "store-disk-pmem-aligned" {} ''
         cp ${config.microvm.storeDisk} $out
         chmod u+w $out
