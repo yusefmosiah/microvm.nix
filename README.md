@@ -34,6 +34,11 @@ imperatively with the provided `microvm` command.
   `/nix/store` or by mounting the host's along with an optional
   writable overlay. This filesystem can be built as either *squashfs*
   (smaller) or *erofs* (faster).
+- When the immutable `/nix/store` is built onto disk, its transport can
+  stay on a normal block device (`microvm.storeDiskInterface = "blk"`,
+  the default) or use persistent memory (`"pmem"`) on supported
+  hypervisors. `pmem` is the DAX-oriented optimization path for shared
+  immutable stores; `blk` remains the safer multi-tenant default.
 - You define your MicroVMs in a Nix Flake's `nixosConfigurations`
   section, reusing the `nixosModules` that are exported by this Flake.
 - MicroVMs can access stateful filesystems either on a image volume as
