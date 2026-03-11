@@ -11,7 +11,7 @@ let
     vcpu mem balloon initialBalloonMem hotplugMem hotpluggedMem
     interfaces volumes shares devices
     kernel initrdPath
-    storeDisk credentialFiles vsock;
+    storeDisk storeDiskInterface credentialFiles vsock;
   inherit (microvmConfig.firecracker) cpu;
 
   kernelPath = {
@@ -33,13 +33,13 @@ let
       # Enabling simultaneous multithreading is not supported on aarch64
       smt = system != "aarch64-linux";
     };
-    drives = [ {
+    drives = lib.optional (storeDiskInterface == "blk") {
       drive_id = "store";
       path_on_host = storeDisk;
       is_root_device = false;
       is_read_only = true;
       io_engine = microvmConfig.firecracker.driveIoEngine;
-    } ] ++ map ({ image, serial, direct, readOnly, ... }:
+    } ++ map ({ image, serial, direct, readOnly, ... }:
       lib.warnIf (serial != null) ''
         Volume serial is not supported for firecracker
       ''
@@ -69,6 +69,14 @@ let
         }
       else
         null;
+  }
+  // lib.optionalAttrs (storeDiskInterface == "pmem") {
+    pmem = [ {
+      id = "store";
+      path_on_host = toString storeDisk;
+      root_device = false;
+      read_only = true;
+    } ];
   }
   // lib.optionalAttrs (cpu != null) {
     cpu-config = pkgs.writeText "cpu-config.json" (builtins.toJSON cpu);

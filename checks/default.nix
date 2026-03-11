@@ -109,6 +109,26 @@ let
         } ];
       }) ];
     } ]
+    # storeDiskInterface
+    [ {
+      # blk (default)
+      id = null;
+    } {
+      # pmem
+      id = "pmem";
+      modules = [ ({ config, ... }: {
+        microvm = {
+          storeDiskInterface = "pmem";
+          storeDiskType = "erofs";
+          storeDiskErofsFlags = [];
+          testing.enableTest = builtins.elem config.microvm.hypervisor [
+            "cloud-hypervisor" "firecracker"
+          ]
+          # pmem is incompatible with a host /nix/store share
+          && config.microvm.storeOnDisk;
+        };
+      }) ];
+    } ]
     # boot.systemd
     [ {
       # no
@@ -230,6 +250,7 @@ import ./microvm-command.nix args //
 import ./imperative-template.nix args //
 import ./startup-shutdown.nix args //
 import ./shutdown-command.nix args //
+import ./pmem.nix { inherit self nixpkgs system; } //
 
 builtins.foldl' (result: hypervisor:
   let

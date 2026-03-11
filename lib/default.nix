@@ -15,10 +15,10 @@ rec {
 
   defaultFsType = "ext4";
 
-  withDriveLetters = { volumes, storeOnDisk, ... }:
+  withDriveLetters = { volumes, storeOnDisk, storeDiskInterface ? "blk", ... }:
     let
       offset =
-        if storeOnDisk
+        if storeOnDisk && storeDiskInterface == "blk"
         then 1
         else 0;
     in

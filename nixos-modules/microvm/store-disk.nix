@@ -48,6 +48,16 @@ in
     '';
   };
 
+  options.microvm.storeDiskPmemImage = with lib; mkOption {
+    type = types.path;
+    internal = true;
+    description = ''
+      2 MiB-aligned store disk image for pmem attachment.
+      Used by cloud-hypervisor which requires aligned backing files.
+      Firecracker auto-pads internally and uses storeDisk directly.
+    '';
+  };
+
   config = lib.mkMerge [
     (lib.mkIf (config.microvm.guest.enable && config.microvm.storeOnDisk) {
       # nixos/modules/profiles/hardened.nix forbids erofs.
@@ -92,6 +102,17 @@ in
             cp -a $(sort -u ${storeDiskContents}) store/
             time ${mkfsCommand}
           )
+      '';
+    })
+
+    (lib.mkIf (config.microvm.guest.enable && config.microvm.storeOnDisk && config.microvm.storeDiskInterface == "pmem") {
+      microvm.storeDiskPmemImage = pkgs.runCommand "store-disk-pmem-aligned" {} ''
+        cp ${config.microvm.storeDisk} $out
+        chmod u+w $out
+        size=$(stat -c%s $out)
+        align=$((2 * 1024 * 1024))
+        aligned=$(( ((size + align - 1) / align) * align ))
+        truncate -s "$aligned" $out
       '';
     })
 

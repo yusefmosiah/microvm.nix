@@ -8,7 +8,7 @@
 
 let
   inherit (pkgs) lib;
-  inherit (microvmConfig) vcpu mem balloon initialBalloonMem deflateOnOOM hotplugMem hotpluggedMem user interfaces volumes shares socket devices hugepageMem graphics storeDisk storeOnDisk kernel initrdPath credentialFiles vsock;
+  inherit (microvmConfig) vcpu mem balloon initialBalloonMem deflateOnOOM hotplugMem hotpluggedMem user interfaces volumes shares socket devices hugepageMem graphics storeDisk storeDiskInterface storeOnDisk kernel initrdPath credentialFiles vsock;
   inherit (microvmConfig.cloud-hypervisor) platformOEMStrings extraArgs;
 
   # extract all the extra args that we merge with up front
@@ -204,8 +204,13 @@ in {
       ++
       lib.optionals balloon [ "--balloon" balloonOps ]
       ++
+      lib.optionals (storeOnDisk && storeDiskInterface == "pmem") [
+        "--pmem"
+        "file=${toString microvmConfig.storeDiskPmemImage},readonly=on"
+      ]
+      ++
       arg "--disk" (
-        lib.optional storeOnDisk (opsMapped ({
+        lib.optional (storeOnDisk && storeDiskInterface == "blk") (opsMapped ({
           path = toString storeDisk;
           readonly = "on";
         } // mqOps))

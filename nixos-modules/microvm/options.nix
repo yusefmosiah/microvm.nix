@@ -978,6 +978,25 @@ in
       type = with types; attrsOf lines;
     };
 
+    storeDiskInterface = mkOption {
+      type = types.enum [ "blk" "pmem" ];
+      default = "blk";
+      description = ''
+        Transport used to attach the built immutable store image.
+
+        `blk` uses a normal block device (default, safe for multi-tenant).
+
+        `pmem` uses a persistent-memory device with DAX support, intended
+        for immutable read-only store images on supported hypervisors
+        (cloud-hypervisor, firecracker). Sharing the same pmem backing
+        file across VMs may expose access-pattern side channels; use
+        `blk` for private multi-tenant workloads.
+
+        `pmem` currently requires `storeOnDisk = true`,
+        `storeDiskType = "erofs"`, and uncompressed erofs.
+      '';
+    };
+
     storeDiskType = mkOption {
       type = types.enum [ "squashfs" "erofs" ];
       description = ''

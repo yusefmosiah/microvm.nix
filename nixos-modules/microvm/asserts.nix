@@ -107,6 +107,40 @@ lib.mkIf config.microvm.guest.enable {
       '';
     } ]
     ++
+    # storeDiskInterface = "pmem" assertions
+    lib.optionals (config.microvm.storeDiskInterface == "pmem") [
+      {
+        assertion = config.microvm.storeOnDisk;
+        message = ''
+          MicroVM ${hostName}: `microvm.storeDiskInterface = "pmem"` requires
+          `microvm.storeOnDisk = true`.
+        '';
+      }
+      {
+        assertion = config.microvm.storeDiskType == "erofs";
+        message = ''
+          MicroVM ${hostName}: `microvm.storeDiskInterface = "pmem"` requires
+          `microvm.storeDiskType = "erofs"`.
+        '';
+      }
+      {
+        assertion = !builtins.any (f: lib.hasPrefix "-z" f) config.microvm.storeDiskErofsFlags;
+        message = ''
+          MicroVM ${hostName}: `microvm.storeDiskInterface = "pmem"` requires
+          uncompressed erofs. Compressed erofs cannot use DAX — this is a hard
+          kernel limitation. Remove compression flags from
+          `microvm.storeDiskErofsFlags`.
+        '';
+      }
+      {
+        assertion = builtins.elem config.microvm.hypervisor [ "cloud-hypervisor" "firecracker" ];
+        message = ''
+          MicroVM ${hostName}: `microvm.storeDiskInterface = "pmem"` is only
+          supported with cloud-hypervisor and firecracker.
+        '';
+      }
+    ]
+    ++
     # cloud-hypervisor specific asserts
     lib.optionals (config.microvm.hypervisor == "cloud-hypervisor") [ {
       assertion = ! (lib.any (str: lib.hasInfix "oem_strings" str) config.microvm.cloud-hypervisor.platformOEMStrings);

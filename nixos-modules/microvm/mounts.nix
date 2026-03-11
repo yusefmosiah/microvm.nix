@@ -1,7 +1,7 @@
 { config, lib, ... }:
 
 let
-  inherit (config.microvm) storeDiskType storeOnDisk writableStoreOverlay;
+  inherit (config.microvm) storeDiskType storeDiskInterface storeOnDisk writableStoreOverlay;
 
   inherit (import ../../lib {
     inherit lib;
@@ -44,7 +44,8 @@ lib.mkIf config.microvm.guest.enable {
       "/nix/store" = {
         device = roStoreDisk;
         fsType = storeDiskType;
-        options = [ "x-systemd.after=systemd-modules-load.service" ];
+        options = [ "x-systemd.after=systemd-modules-load.service" ]
+          ++ lib.optional (storeDiskInterface == "pmem" && storeDiskType == "erofs") "dax";
         neededForBoot = true;
         noCheck = true;
       };
@@ -72,7 +73,8 @@ lib.mkIf config.microvm.guest.enable {
       "/nix/.ro-store" = {
         device = roStoreDisk;
         fsType = storeDiskType;
-        options = [ "ro" "x-systemd.after=systemd-modules-load.service" ];
+        options = [ "ro" "x-systemd.after=systemd-modules-load.service" ]
+          ++ lib.optional (storeDiskInterface == "pmem" && storeDiskType == "erofs") "dax";
         neededForBoot = true;
         noCheck = true;
       };
