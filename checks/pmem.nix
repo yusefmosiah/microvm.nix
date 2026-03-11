@@ -106,12 +106,44 @@ in
 
     echo ""
     echo "=== Firecracker pmem config ==="
-    fcPmemConfig=$(cat ${fcPmemRunner}/bin/microvm-run)
+    fcPmemScript=$(cat ${fcPmemRunner}/bin/microvm-run)
+    fcPmemConfigPath=$(printf '%s\n' "$fcPmemScript" | grep -o '/nix/store/[^ ]*firecracker-[^ ]*\.json' | head -1)
+    test -n "$fcPmemConfigPath" || {
+      echo "FAIL: could not find Firecracker pmem config JSON path"
+      exit 1
+    }
+    fcPmemConfig=$(cat "$fcPmemConfigPath")
     echo "$fcPmemConfig"
+
+    printf '%s\n' "$fcPmemConfig" | grep -q '"pmem"' || {
+      echo "FAIL: firecracker pmem config missing pmem section"
+      exit 1
+    }
+    printf '%s\n' "$fcPmemConfig" | grep -q '"path_on_host"' || {
+      echo "FAIL: firecracker pmem config missing path_on_host"
+      exit 1
+    }
+    echo "PASS: firecracker pmem config has pmem section"
 
     echo ""
     echo "=== Firecracker blk config ==="
-    fcBlkConfig=$(cat ${fcBlkRunner}/bin/microvm-run)
+    fcBlkScript=$(cat ${fcBlkRunner}/bin/microvm-run)
+    fcBlkConfigPath=$(printf '%s\n' "$fcBlkScript" | grep -o '/nix/store/[^ ]*firecracker-[^ ]*\.json' | head -1)
+    test -n "$fcBlkConfigPath" || {
+      echo "FAIL: could not find Firecracker blk config JSON path"
+      exit 1
+    }
+    fcBlkConfig=$(cat "$fcBlkConfigPath")
+
+    if printf '%s\n' "$fcBlkConfig" | grep -q '"pmem"'; then
+      echo "FAIL: firecracker blk config should not have pmem section"
+      exit 1
+    fi
+    printf '%s\n' "$fcBlkConfig" | grep -q '"drives"' || {
+      echo "FAIL: firecracker blk config missing drives section"
+      exit 1
+    }
+    echo "PASS: firecracker blk config uses drives only"
 
     echo ""
     echo "=== Alignment check ==="
@@ -125,9 +157,24 @@ in
     echo "PASS: pmem image is 2 MiB aligned (size: $size)"
 
     echo ""
-    echo "=== Mount options check ==="
+    echo "=== Store mount config check ==="
     chPmemOpts="${builtins.concatStringsSep " " chPmemMountOpts}"
     chBlkOpts="${builtins.concatStringsSep " " chBlkMountOpts}"
+
+    # Both transports use label-based device lookup for erofs;
+    # the symlink resolves to /dev/pmem0 or /dev/vda at runtime.
+    chPmemDevice="${chPmem.config.fileSystems."/nix/store".device}"
+    chBlkDevice="${chBlk.config.fileSystems."/nix/store".device}"
+    [ "$chPmemDevice" = "/dev/disk/by-label/nix-store" ] || {
+      echo "FAIL: pmem store device should be /dev/disk/by-label/nix-store (got: $chPmemDevice)"
+      exit 1
+    }
+    echo "PASS: pmem store device uses label-based lookup"
+    [ "$chBlkDevice" = "/dev/disk/by-label/nix-store" ] || {
+      echo "FAIL: blk store device should be /dev/disk/by-label/nix-store (got: $chBlkDevice)"
+      exit 1
+    }
+    echo "PASS: blk store device uses label-based lookup"
 
     echo "CH pmem mount options: $chPmemOpts"
     echo "CH blk mount options: $chBlkOpts"

@@ -22,7 +22,7 @@ let
     if storeOnDisk
     then
       if storeDiskType == "erofs"
-      # erofs supports filesystem labels
+      # erofs supports filesystem labels; works for both blk and pmem transports
       then "/dev/disk/by-label/nix-store"
       else "/dev/vda"
     else throw "No disk letter when /nix/store is not in disk";
@@ -44,7 +44,7 @@ lib.mkIf config.microvm.guest.enable {
       "/nix/store" = {
         device = roStoreDisk;
         fsType = storeDiskType;
-        options = [ "x-systemd.after=systemd-modules-load.service" ]
+        options = [ "ro" "x-systemd.after=systemd-modules-load.service" ]
           ++ lib.optional (storeDiskInterface == "pmem" && storeDiskType == "erofs") "dax";
         neededForBoot = true;
         noCheck = true;

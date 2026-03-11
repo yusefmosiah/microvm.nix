@@ -38,6 +38,8 @@ let
             in ''
               ${pkgs.coreutils}/bin/uname > /output/kernel-name
               ${pkgs.coreutils}/bin/uname -m > /output/machine-name
+              ${pkgs.util-linux}/bin/findmnt -n -o SOURCE /nix/store > /output/store-source
+              ${pkgs.util-linux}/bin/findmnt -n -o OPTIONS /nix/store > /output/store-options
 
               ${exit}
             '';
@@ -69,7 +71,7 @@ builtins.mapAttrs (_: nixos:
   in ''
     microvm-run
 
-    7z e output.img kernel-name machine-name
+    7z e output.img kernel-name machine-name store-source store-options
 
     EXPECTED_KERNEL_NAME="Linux"
     if [ "$(cat kernel-name)" != "$EXPECTED_KERNEL_NAME" ] ; then
@@ -83,7 +85,28 @@ builtins.mapAttrs (_: nixos:
       exit 1
     fi
 
+    ${if nixos.config.microvm.storeOnDisk then ''
+      STORE_SOURCE="$(cat store-source)"
+      STORE_OPTIONS="$(cat store-options)"
+
+      if [ "${nixos.config.microvm.storeDiskInterface}" = "pmem" ]; then
+        echo "$STORE_SOURCE" | grep -q 'pmem' || {
+          echo "/nix/store source should be pmem-backed for pmem interface (got: $STORE_SOURCE)"
+          exit 1
+        }
+        echo "$STORE_OPTIONS" | grep -q 'dax' || {
+          echo "/nix/store options should include dax for pmem interface (got: $STORE_OPTIONS)"
+          exit 1
+        }
+      else
+        if echo "$STORE_OPTIONS" | grep -q 'dax'; then
+          echo "/nix/store options should not include dax for blk interface (got: $STORE_OPTIONS)"
+          exit 1
+        fi
+      fi
+    '' else ""}
+
     mkdir $out
-    cp {kernel-name,machine-name} $out
+    cp {kernel-name,machine-name,store-source,store-options} $out
   '')
 ) configs
