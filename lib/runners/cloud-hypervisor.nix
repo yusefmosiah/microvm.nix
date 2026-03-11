@@ -49,9 +49,11 @@ let
                   else userVSockCID;
   supportsNotifySocket = vsockCID != null;
   vsockPath = if userVSockPath != null then userVSockPath else "notify.vsock";
+  # AF_VSOCK is optional for cloud-hypervisor. When unset, we simply omit the
+  # device and do not enable the notify-socket bridge.
   vsockOpts =
     if vsockCID == null then
-      lib.warn "cloud-hypervisor supports systemd-notify via vsock, but `microvm.vsock.cid` must be set to enable this." ""
+      ""
     else
       "cid=${toString vsockCID},socket=${vsockPath}";
 
