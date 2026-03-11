@@ -79,12 +79,12 @@ in
     }
     echo "PASS: cloud-hypervisor pmem runner has --pmem"
 
-    # CH pmem runner must have readonly=on in pmem arg
-    echo "$chPmemScript" | grep -q 'readonly=on' || {
-      echo "FAIL: cloud-hypervisor pmem runner missing readonly=on"
+    # CH pmem runner must have discard_writes=on in pmem arg
+    echo "$chPmemScript" | grep -q 'discard_writes=on' || {
+      echo "FAIL: cloud-hypervisor pmem runner missing discard_writes=on"
       exit 1
     }
-    echo "PASS: cloud-hypervisor pmem runner has readonly=on"
+    echo "PASS: cloud-hypervisor pmem runner has discard_writes=on"
 
     echo ""
     echo "=== Cloud Hypervisor blk runner ==="

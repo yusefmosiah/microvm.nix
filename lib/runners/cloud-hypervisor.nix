@@ -206,7 +206,7 @@ in {
       ++
       lib.optionals (storeOnDisk && storeDiskInterface == "pmem") [
         "--pmem"
-        "file=${toString microvmConfig.storeDiskPmemImage},readonly=on"
+        "file=${toString microvmConfig.storeDiskPmemImage},discard_writes=on"
       ]
       ++
       arg "--disk" (
