@@ -111,8 +111,15 @@ in
       # kernelModules force-loads at initrd start; availableKernelModules
       # only makes the module present but relies on hotplug autoloading,
       # which is too slow and causes device-wait timeouts.
-      # NixOS automatically includes module dependencies (libnvdimm, etc.).
-      boot.initrd.kernelModules = [ "virtio_pmem" ];
+      # cbc must come before virtio_pmem: encrypted-keys.ko (a dep of
+      # libnvdimm.ko, which in turn is a dep of virtio_pmem.ko) calls
+      # crypto_alloc_skcipher("cbc(aes)") in its module_init. With
+      # CONFIG_KEY_DH_OPERATIONS=y (NixOS default), the "cbc(aes)" template
+      # is selected. cbc.ko provides the template via CONFIG_CRYPTO_CBC=m
+      # but is NOT listed in modules.dep for encrypted-keys.ko (it is a
+      # runtime crypto registration, not a symbol export). Loading cbc
+      # before virtio_pmem ensures the template is registered.
+      boot.initrd.kernelModules = [ "cbc" "virtio_pmem" ];
 
       # On kernels built with CONFIG_NVDIMM_KEYS=y (the NixOS default),
       # libnvdimm.ko has a hard symbol dependency on encrypted-keys.ko,
