@@ -24,6 +24,52 @@ let
       ] ++ extraModules;
     });
 
+  # Helper to build a NixOS config for KVM boot tests
+  mkBootConfig = { hypervisor }: lib.nixosSystem {
+    inherit system;
+    modules = [
+      self.nixosModules.microvm
+      ({ config, lib, pkgs, ... }: {
+        networking = {
+          hostName = "pmem-boot-test";
+          useDHCP = false;
+        };
+        microvm = {
+          inherit hypervisor;
+          storeDiskInterface = "pmem";
+          storeDiskType = "erofs";
+          storeDiskErofsFlags = [];
+          volumes = [ {
+            image = "output.img";
+            label = "output";
+            mountPoint = "/output";
+            size = 32;
+          } ];
+          socket = "pmem-boot-test.sock";
+        };
+        systemd.services.poweroff-again = {
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig.Type = "idle";
+          script =
+            let
+              exit = {
+                cloud-hypervisor = "poweroff";
+                firecracker = "reboot";
+              }.${hypervisor};
+            in ''
+              ${pkgs.util-linux}/bin/findmnt -n -o SOURCE /nix/store > /output/store-source
+              ${pkgs.util-linux}/bin/findmnt -n -o OPTIONS /nix/store > /output/store-options
+              ${exit}
+            '';
+        };
+        system.stateVersion = lib.trivial.release;
+      })
+    ];
+  };
+
+  chPmemBoot = mkBootConfig { hypervisor = "cloud-hypervisor"; };
+  fcPmemBoot = mkBootConfig { hypervisor = "firecracker"; };
+
   # Cloud Hypervisor with pmem
   chPmem = mkConfig {
     hypervisor = "cloud-hypervisor";
@@ -194,5 +240,65 @@ in
     echo ""
     echo "All pmem runner generation checks passed!"
     mkdir $out
+  '';
+
+  pmem-boot-cloud-hypervisor = pkgs.runCommandLocal "pmem-boot-cloud-hypervisor" {
+    nativeBuildInputs = [
+      chPmemBoot.config.microvm.declaredRunner
+      pkgs.p7zip
+    ];
+    requiredSystemFeatures = [ "kvm" ];
+    meta.timeout = 120;
+  } ''
+    microvm-run
+    7z e output.img store-source store-options
+
+    echo "Store source: $(cat store-source)"
+    echo "Store options: $(cat store-options)"
+
+    grep -q 'pmem' store-source || {
+      echo "FAIL: /nix/store not pmem-backed (got: $(cat store-source))"
+      exit 1
+    }
+    echo "PASS: /nix/store is pmem-backed"
+
+    grep -q 'dax' store-options || {
+      echo "FAIL: /nix/store missing dax mount option (got: $(cat store-options))"
+      exit 1
+    }
+    echo "PASS: /nix/store has dax mount option"
+
+    mkdir $out
+    cp {store-source,store-options} $out
+  '';
+
+  pmem-boot-firecracker = pkgs.runCommandLocal "pmem-boot-firecracker" {
+    nativeBuildInputs = [
+      fcPmemBoot.config.microvm.declaredRunner
+      pkgs.p7zip
+    ];
+    requiredSystemFeatures = [ "kvm" ];
+    meta.timeout = 120;
+  } ''
+    microvm-run
+    7z e output.img store-source store-options
+
+    echo "Store source: $(cat store-source)"
+    echo "Store options: $(cat store-options)"
+
+    grep -q 'pmem' store-source || {
+      echo "FAIL: /nix/store not pmem-backed (got: $(cat store-source))"
+      exit 1
+    }
+    echo "PASS: /nix/store is pmem-backed"
+
+    grep -q 'dax' store-options || {
+      echo "FAIL: /nix/store missing dax mount option (got: $(cat store-options))"
+      exit 1
+    }
+    echo "PASS: /nix/store has dax mount option"
+
+    mkdir $out
+    cp {store-source,store-options} $out
   '';
 }
