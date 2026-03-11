@@ -106,6 +106,12 @@ in
     })
 
     (lib.mkIf (config.microvm.guest.enable && config.microvm.storeOnDisk && config.microvm.storeDiskInterface == "pmem") {
+      # virtio_pmem must be available in the initrd so the pmem device
+      # appears before stage-1 attempts to mount the store.
+      # NixOS automatically resolves and includes module dependencies
+      # (libnvdimm, nd_e820, etc.) when virtio_pmem is listed here.
+      boot.initrd.availableKernelModules = [ "virtio_pmem" ];
+
       microvm.storeDiskPmemImage = pkgs.runCommand "store-disk-pmem-aligned" {} ''
         cp ${config.microvm.storeDisk} $out
         chmod u+w $out
