@@ -103,7 +103,9 @@ let
   # Verify alignment of pmem image
   chPmemImage = chPmem.config.microvm.storeDiskPmemImage;
 
-  # Verify mount options include dax for pmem
+  # Verify store device and mount options for pmem
+  chPmemStoreDevice = chPmem.config.fileSystems."/nix/store".device;
+  chBlkStoreDevice = chBlk.config.fileSystems."/nix/store".device;
   chPmemMountOpts = chPmem.config.fileSystems."/nix/store".options;
   chBlkMountOpts = chBlk.config.fileSystems."/nix/store".options;
 
@@ -207,15 +209,13 @@ in
     chPmemOpts="${builtins.concatStringsSep " " chPmemMountOpts}"
     chBlkOpts="${builtins.concatStringsSep " " chBlkMountOpts}"
 
-    # Both transports use label-based device lookup for erofs;
-    # the symlink resolves to /dev/pmem0 or /dev/vda at runtime.
-    chPmemDevice="${chPmem.config.fileSystems."/nix/store".device}"
-    chBlkDevice="${chBlk.config.fileSystems."/nix/store".device}"
-    [ "$chPmemDevice" = "/dev/disk/by-label/nix-store" ] || {
-      echo "FAIL: pmem store device should be /dev/disk/by-label/nix-store (got: $chPmemDevice)"
+    chPmemDevice="${chPmemStoreDevice}"
+    chBlkDevice="${chBlkStoreDevice}"
+    [ "$chPmemDevice" = "/dev/pmem0" ] || {
+      echo "FAIL: pmem store device should be /dev/pmem0 (got: $chPmemDevice)"
       exit 1
     }
-    echo "PASS: pmem store device uses label-based lookup"
+    echo "PASS: pmem store device uses /dev/pmem0"
     [ "$chBlkDevice" = "/dev/disk/by-label/nix-store" ] || {
       echo "FAIL: blk store device should be /dev/disk/by-label/nix-store (got: $chBlkDevice)"
       exit 1

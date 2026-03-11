@@ -21,8 +21,10 @@ let
   roStoreDisk =
     if storeOnDisk
     then
-      if storeDiskType == "erofs"
-      # erofs supports filesystem labels; works for both blk and pmem transports
+      if storeDiskInterface == "pmem"
+      then "/dev/pmem0"
+      else if storeDiskType == "erofs"
+      # erofs supports filesystem labels for blk transports
       then "/dev/disk/by-label/nix-store"
       else "/dev/vda"
     else throw "No disk letter when /nix/store is not in disk";
